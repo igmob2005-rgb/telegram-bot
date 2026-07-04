@@ -2,7 +2,7 @@ import sqlite3
 import os
 from Telegram_API.config import DB_PATH
 from datetime import datetime
-from typing import Optional, List, Tuple  # Импортируем список для возврата данных
+from typing import Optional, List, Tuple 
 
 
 # --- Инициализация Базы Данных (Обновление) ---
@@ -11,7 +11,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    # 1. Таблица Users, Orders (Остаются прежними)
+    # 1. Таблица Users, Orders
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         from_where TEXT,
@@ -36,7 +36,7 @@ def init_db():
         )
     """)
 
-    # 2. НОВЫЙ: Таблица для хранения ВСЕХ выбранных деталей заказа (Исторический лог выбора)
+    # 2. Таблица для хранения ВСЕХ выбранных деталей заказа
     cur.execute("""
         CREATE TABLE IF NOT EXISTS order_details (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +59,7 @@ def init_db():
         )
     """)
 
-    # 3. Таблица Admins (Остается прежней)
+    # 3. Таблица Admins 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS admins (
         user_id INTEGER PRIMARY KEY,
@@ -90,7 +90,6 @@ def add_user(user_id: int, username: str | None, first_name: str, role: str):
 
 
 def user_exists(user_id: int) -> bool:
-    # ... (Остается без изменений)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
@@ -100,7 +99,6 @@ def user_exists(user_id: int) -> bool:
 
 
 def save_logs(user_id: int, message_text: str):
-    # ... (Остается без изменений)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -113,7 +111,6 @@ def save_logs(user_id: int, message_text: str):
 
 
 def is_admin(user_id: int) -> bool:
-    # ... (Остается без изменений)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM admins WHERE user_id = ?", (user_id,))
@@ -123,7 +120,6 @@ def is_admin(user_id: int) -> bool:
 
 
 def remove_admin(user_id: int):
-    # ... (Остается без изменений)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
@@ -132,7 +128,6 @@ def remove_admin(user_id: int):
 
 
 def get_last_logs(limit=10):
-    # ... (Остается без изменений)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT * FROM logs ORDER BY id DESC LIMIT ?", (limit,))
@@ -156,7 +151,7 @@ def create_draft_order(user_id: int, username: str, service_type: str) -> int:
 
 def add_order_detail(order_id: int, category: str, key: str, label: str, value: Optional[str] = None):
     """
-    НОВЫЙ ФУНКЦИОНАЛ: Записывает ОДИН выбранный пункт в лог деталей заказа.
+    Записывает ОДИН выбранный пункт в лог деталей заказа.
     Этот вызов должен происходить при каждом клике пользователя по кнопке меню/callback.
     """
     with sqlite3.connect(DB_PATH) as conn:
@@ -179,7 +174,6 @@ def create_order(from_where: str, user_id: int, username: str, service_type: str
     Финальный этап. Используется для закрытия заказа и сохранения всех деталей.
     Поскольку все детали уже записаны в order_details, здесь только финальная запись.
     """
-#    for text, user_id in list;
 
 
 
@@ -188,7 +182,6 @@ def create_order(from_where: str, user_id: int, username: str, service_type: str
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    # Если мы просто завершаем заказ, нам достаточно перезаписать основную запись (order)
     cur.execute("""
     INSERT INTO orders (from_where, user_id, service_type, description, status, deadline)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -204,7 +197,7 @@ def create_order(from_where: str, user_id: int, username: str, service_type: str
 
 def get_full_order_details(order_id: int) -> Tuple[Optional[dict], List[dict]]:
     """
-    НОВЫЙ ФУНКЦИОНАЛ: Получает полный набор данных о заказе.
+    Получает полный набор данных о заказе.
     Возвращает словарь с общей информацией (из 'orders') и список всех деталей (из 'order_details').
     """
     conn = sqlite3.connect(DB_PATH)
@@ -245,7 +238,6 @@ def get_full_order_details(order_id: int) -> Tuple[Optional[dict], List[dict]]:
 
 
 def get_orders():
-    # ... (Остается без изменений)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT * FROM orders")
@@ -255,7 +247,6 @@ def get_orders():
 
 
 def update_order_field(order_id: int, field: str, value):
-    # ... (Остается без изменений)
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.cursor()
         cur.execute("""
