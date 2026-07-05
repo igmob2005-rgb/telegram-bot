@@ -23,8 +23,6 @@ async def handle_order_details_selection(callback: CallbackQuery, state):
     data = callback.data
     parts = data.split(":")
 
-    # Безопасный парсинг данных: ожидаем минимум 4 части (prefix:category:key:id)
-    #if len(parts) >3:
 
 
     try:
@@ -42,23 +40,13 @@ async def handle_order_details_selection(callback: CallbackQuery, state):
     action_successful = False
 
     if "back" in selection_key or "back" in data:
-        # Если это возврат, мы ничего не логируем, и сразу выходим.
         message_text, next_keyboard, is_navigation_return = _handle_military_route(selection_key, order_id)
         action_successful = False # Игнорируем весь остальной код
     else:
-        # ВСЕ ПРОЧЕЕ ДЕЛАЕТСЯ ТОЛЬКО, ЕСЛИ ЭТО НЕ КНОПКА НАЗАД.
         is_navigation_return = False
         log_success, db_message = log_selection(order_id, selected_category, selection_key, "Общий выбор пункта", None)
-    # 1. Логирование выбранного элемента (Этот шаг универсален и ВСЕГДА выполняется)
-    #
-        #_handle_military_route
-        #_handle_org_route
-        #_handle_complex_component_route
-        #_handle_color_route
-        #_handle_complex_variety
-        #_handle_form_variety
-        #  data = 'order:unit:05812:96'
-        # 2. МАРШРУТИЗАЦИЯ (Dispatching) - САМЫЙ ВАЖНЫЙ БЛОК!
+    # 1. Логирование выбранного элемента 
+        # 2. МАРШРУТИЗАЦИЯ (Dispatching)
 
         if selected_category == "unit":
             result = await _handle_military_route(selection_key, order_id, state)
@@ -94,10 +82,10 @@ async def handle_order_details_selection(callback: CallbackQuery, state):
             action_successful = bool(result and not is_navigation_return)
 
     if is_navigation_return:
-        # ⭐ СЦЕНАРИЙ ВОЗВРАТА (ВАЖНО: НЕ ЛОГИРУЕМ) ⭐
+        # ⭐ СЦЕНАРИЙ ВОЗВРАТА ⭐
         await callback.answer("Навигация:", show_alert=True)
         await callback.message.edit_text(text=message_text, reply_markup=next_keyboard or None)
-        return  # Завершаем выполнение функции
+        return
 
     elif action_successful:
         try:
@@ -107,27 +95,22 @@ async def handle_order_details_selection(callback: CallbackQuery, state):
             await callback.answer("Продолжайте.....")
             # return
     elif db_message and not is_navigation_return:
-        # Сценарий C1: Логирование ПРОВАЛИЛОСЬ (но это не возврат!), и мы должны уведомить об этом.
-        # Мы НЕ меняем текст, а просто уведомляем пользователя в всплывашке.
+        # Сценарий C1: Логирование ПРОВАЛИЛОСЬ 
         await callback.answer(db_message, show_alert=True)
         return # Ничего не рисуем на экране, только предупреждение!
 
     elif not action_successful and not is_navigation_return:
         # Сценарий D: Неизвестный ключ (Не было ни возврата, ни выбора).
         await callback.answer("❌ Выбран элемент, который пока не имеет детальной обработки в системе.")
-        return # И ничего не рисуем на экране.
+        return
     else:
-        # Это наш рабочий сценарий "Сценарий 3" из предыдущей версии.
         await callback.message.edit_text(text=message_text, reply_markup=next_keyboard)
         await callback.answer("✅ Пункт успешно добавлен в заказ! Ожидайте дальнейших действий.")
 
     if next_keyboard:
-        # Сценарий 1: Мы должны продолжить работу. Сообщение должно быть информативным.
         await callback.message.edit_text(text=message_text, reply_markup=next_keyboard)
     elif message_text:
-        # Сценарий 2: Нет следующей клавиатуры (конец ветки), но есть сообщение для пользователя.
         await callback.message.edit_text(text=message_text)
     else:
-        # Сценарий 3: Мы успешно завершили действие, и делать текст или класс не нужно.
         # Просто уведомляем через всплывающее окошко (callback.answer).
         await callback.answer("✅ Пункт успешно добавлен в заказ! Ожидаем дальнейших действий.")
