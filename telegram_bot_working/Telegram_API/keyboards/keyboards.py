@@ -134,7 +134,7 @@ def service_level_3_2_keyboard(order_id: int) -> InlineKeyboardMarkup:
         ]
     )
 
-def service_level_3_2_1_keyboard(order_id: int) -> InlineKeyboardMarkup:
+def service_level_3_2_2_keyboard(order_id: int) -> InlineKeyboardMarkup:
     """Подраздел 3.2.1: Выбор цвета для элемента (Номера)."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -176,7 +176,7 @@ def service_level_5_keyboard(order_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🛡️ Левый нарукавный", callback_data=f"order:complex:left_arm:{order_id}")],
             [InlineKeyboardButton(text="🛡️ Правый нарукавный", callback_data=f"order:complex:right_arm:{order_id}")],
             [InlineKeyboardButton(text="🏷️ Нагрудный ФИО", callback_data=f"order:complex:fio_start:{order_id}")], # -> 5.1
-            [InlineKeyboardButton(text="🎖️ Нагрудный ВСР", callback_data=f"order:complex:vsr_start:{order_id}")], # Общая ветка для нагрудника с ВС
+            [InlineKeyboardButton(text="🎖️ Нагрудный ВСР", callback_data=f"order:complex:vsr:{order_id}")], # Общая ветка для нагрудника с ВС
             [InlineKeyboardButton(text="⬅️ Назад к выбору услуг", callback_data="menu:back")]
         ]
     )

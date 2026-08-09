@@ -3,24 +3,20 @@ import logging
 from aiogram import Router
 from aiogram import types
 from aiogram.types import message
-
-# ВАЖНО: Импортируйте ваше состояние (Form) из complex_components или отдельного места
-from .complex_components import Form  # Убедитесь, что путь к состоянию верен
+from .complex_components import Form
 from aiogram.fsm.context import FSMContext
 from Telegram_API.keyboards.keyboards import service_level_5_1_2_keyboard, service_level_5_keyboard, \
-                                                service_level_5_1_3_keyboard
+    service_level_5_1_3_keyboard, services_keyboard
+from Pricelist import PricelistManager
 
 router = Router()
+pm = PricelistManager()
 
-
-@router.message(lambda message: True)  # Использование общего фильтра для всех текстовых сообщений в контексте заказа
+@router.message(lambda message: True)  # Универсальный обработчик для всех текстовых сообщений в контексте заказа
 async def handle_incoming_text_input(message: types.Message, state: FSMContext):
     """
-    Универсальный обработчик всего входящего текста от пользователя,
-    когда он находится в режиме ввода данных (FSM).
-
-    ВАЖНО: Вам нужно реализовать логику ветвления внутри этой функции,
-    проверяя текущее состояние.
+    Универсальный обработчик всего входящего текста от пользователя.
+    Определяет логику ветвления только на основе текущего состояния (current_state).
     """
     user_input = message.text
 
@@ -28,120 +24,173 @@ async def handle_incoming_text_input(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите текст.")
         return
 
-    # --- 1. Получение текущего состояния (Определение контекста ввода) ---
+    # --- 1. Получение контекста ---
     current_state: Optional[Form] = await state.get_state()
     user_data = await state.get_data()
     order_id = user_data.get('order_id')
 
     if current_state is None:
-        # Если мы не знаем, в каком блоке введен текст (ошибка или сбой),
         await message.answer("Ошибка: Невозможно обработать ваш ввод. Пожалуйста, выберите действие в меню.")
-        return
+        return services_keyboard()
 
     logging.info(f"Пользователь вошел в состояние {current_state} и ввел: '{user_input}'")
 
-    # --- 2. БЛОК ВЕТВЛЕНИЯ (Логика, что делать с текстом) ---
-    await state.update_data(family=user_input)
-    if current_state == Form.familia:
-        try:
-            await state.set_state(Form.initsialy)
-            messag = f"✅ Фамилия '{user_input}' успешно сохранена.\nТеперь, пожалуйста, введите ваши ИНИЦИАЛЫ."
-            next_keyboard = service_level_5_1_2_keyboard(order_id=order_id)  # Нужно передать order_id!
-            await message.answer(messag, reply_markup=next_keyboard)
+    # --- 2. БЛОК ВЕТВЛЕНИЯ (Используем ELIF для исключения конфликтов) ---
 
-        except Exception as e:
-            logging.error(f"Ошибка при сохранении ФИО: {e}")
-            await state.set_state(Form.familia)
-
-            await message.answer("Произошла ошибка при записи данных.")
-
+    if current_state == Form.lens:
+        await process_handling_lens(message, user_input, state, order_id)
 
     elif current_state == Form.initsialy:
-        try:
-            await state.update_data(initials=user_input)
-            messag = f"🎉 Заказ {order_id} Инициалы '{user_input}' успешно введены! Количество:"
-            await message.answer(messag, reply_markup=service_level_5_1_2_keyboard(order_id))
-            await state.set_state(Form.lens)
-        except Exception as e:
-            logging.error(f"Ошибка при сохранении инициалов: {e}")
-            await message.answer("Произошла ошибка.")
-    elif current_state == Form.lens:
-        try:
-            if int(user_input)>0:
-                await state.update_data(lens=user_input)
-                messag = f"🎉 Заказ {order_id} Количество '{user_input}' успешно введены! далее оплата: Можете оплатить... :::"
-                await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
-                await state.set_state(Form.lens)
-        except Exception as e:
-            if "with base 10" in str(e):
-                messag = f"🎉 Заказ {order_id} Введите Количество числом! Пример: 10"
-                await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
-                await state.set_state(Form.lens)
-            else:
-                logging.error(f"Ошибка при сохранении количества: {e}")
-                await message.answer("Произошла ошибка.")
+        await process_handling_initsialy(message, user_input, state, order_id)
+
     elif current_state == Form.zvanie:
-        try:
-            await state.update_data(zvanie=user_input)
-            messag = f"🎉 Заказ {order_id} Звание '{user_input}' успешно введено! Введите фамилию"
-            await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
-            await state.set_state(Form.familia)
-        except Exception as e:
-            logging.error(f"Ошибка при сохранении звания: {e}")
-            await message.answer("Произошла ошибка.")
+        await process_handling_zvanie(message, user_input, state, order_id)
+
+    elif current_state == Form.familia:
+        await process_handling_familia(message, user_input, state, order_id)
 
     else:
-        # Если состояние не распознано или нет логики для этого состояния
+        # Состояние неизвестно или ввод текста не ожидается
         await message.answer(
             f"В текущем состоянии ({current_state.__name__}) ввод текста не ожидается. Пожалуйста, используйте кнопки меню.")
 
 
+# --- ФУНКЦИИ ОБРАБОТЧИКОВ (Clean Separation of Concerns) ---
+
+async def process_handling_familia(message: types.Message, user_input: str, state: FSMContext, order_id: int):
+    """Обработка ввода Фамилии."""
+    try:
+        # 1. Сохраняем данные в контекст
+        await state.update_data(familia=user_input)
+        # 2. Переводим пользователя на следующий шаг (Инициалы)
+        await state.set_state(Form.initsialy)
+        messag = f"✅ Фамилия '{user_input}' успешно сохранена.\nТеперь, пожалуйста, введите ваши ИНИЦИАЛЫ."
+        next_keyboard = service_level_5_1_2_keyboard(order_id=order_id)
+        await message.answer(messag, reply_markup=next_keyboard)
+
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении ФИО: {e}")
+        await state.set_state(Form.familia) # Возвращаем в текущее состояние в случае ошибки
+        await message.answer("Произошла ошибка при записи данных.")
 
 
+async def process_handling_initsialy(message: types.Message, user_input: str, state: FSMContext, order_id: int):
+    """Обработка ввода Инициалов."""
+    try:
+        # 1. Сохраняем данные в контекст
+        await state.update_data(initsialy=user_input)
+        messag = (f"🎉 Заказ {order_id} Инициалы '{user_input}' успешно введены! \n"
+                  f"Введите количество:")
+        await message.answer(messag, reply_markup=service_level_5_1_2_keyboard(order_id))
+        # 2. Переводим пользователя на следующий шаг (Количество)
+        await state.set_state(Form.lens)
+
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении инициалов: {e}")
+        await message.answer("Произошла ошибка.")
 
 
+async def process_handling_zvanie(message: types.Message, user_input: str, state: FSMContext, order_id: int):
+    """Обработка ввода Звания."""
+    try:
+        # 1. Сохраняем данные в контекст
+        await state.update_data(zvanie=user_input)
+        messag = f"🎉 Заказ {order_id} Звание '{user_input}' успешно введено! Введите фамилию."
+        await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
+        # 2. Переводим пользователя на следующий шаг (Фамилия)
+        await state.set_state(Form.familia)
+
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении звания: {e}")
+        await message.answer("Произошла ошибка.")
 
 
+async def process_handling_lens(message: types.Message, user_input: str, state: FSMContext, order_id: int):
+    """Обработка ввода Количества и завершение заказа."""
+    try:
+        user_input_count = user_input.strip()
 
+        # 1. Валидация ввода (проверяем, является ли ввод числом > 0)
+        if not user_input_count or not str(user_input_count).isdigit() or int(user_input_count) <= 0:
+            messag = (f"⚠️ Количество должно быть положительным целым числом. Попробуйте снова.")
+            await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
+            return
+
+        # 2. Получение всех данных из контекста
+        data = await state.get_data()
+        familia = data.get('familia')
+        initsialy = data.get('initsialy')
+
+        calculated_service_key = data.get('primary_service_key') # Получаем ключ услуги из контекста
+
+        if not familia or not initsialy:
+            error_msg = "⚠️ Критическая ошибка: Не удалось собрать данные клиента. Пожалуйста, начните ввод с фамилии."
+            await message.answer(error_msg)
+            return
+
+        # 3. Обновление и сохранение данных (использование int для количества)
+        new_count = int(user_input_count)  # Преобразуем строку в целое число
+        await state.update_data(lens=new_count)  # Сохраняем правильный тип данных
+
+        # 4. Расчёт стоимости (ДИНАМИЧЕСКИЙ ВЫЗОВ ФУНКЦИИ РАСЧЕТА)
+        if not calculated_service_key:
+            error_msg = "⚠️ Неизвестный ключ услуги. Пожалуйста, начните процесс заказа заново."
+            await message.answer(error_msg)
+            return
+
+        # Расчёт стоимости
+        cost_result = await pm.calculate_total_cost(
+            service_key=calculated_service_key,
+            user_id=order_id,
+            desired_quantity=new_count
+        )
+
+        if cost_result is None:
+            messag = "⚠️ Не удалось рассчитать стоимость из-за ошибки в базе данных."
+            await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
+            return
+        final_cost = cost_result[0]
+
+        # 5. Формирование сообщения с корректными данными
+        fullname = f"{str(familia)} {str(initsialy)}"
+        messag = (f"🎉 Заказ {order_id} \n\n"
+                  f"ФИО {fullname} в количестве {new_count} штук. \n" 
+                  f"\n ИТОГОВАЯ СТОИМОСТЬ: {final_cost:.2f} руб.\n"
+                  f"Далее оплата: Можете оплатить.")
+        await message.answer(messag, reply_markup=service_level_5_1_3_keyboard(order_id))
+
+    except Exception as e:
+        logging.error(f"Ошибка при обработке количества: {e}")
+        # Если ошибка не связана с валидацией (catch-all)
+        await message.answer("Произошла необработанная системная ошибка.")
 
 
 @router.message()  # Обрабатывает ВСЕ текстовые сообщения, которые попадают в этот роутер
 async def handle_incoming_text_input(message: types.Message, state: FSMContext):
-    """Ловит любой текст и решает, что с ним делать, основываясь на текущем состоянии."""
+    """
+    Вся логика перенесена сюда и работает по принципу IF/ELIF.
+    Все остальные вспомогательные функции (process_input_familia, process_input_initsialy) были удалены, так как их логика встроена выше.
+    """
     user_input = message.text
 
-    # 1. Получаем актуальное состояние после поступления сообщения (важно!)
-    current_state = await state.get_state()
+    if not user_input:
+        await message.answer("Пожалуйста, введите текст.")
+        return
+
+    # --- Основная ветка (Исправлено с if/elif) ---
+    current_state: Optional[Form] = await state.get_state()
     user_data = await state.get_data()
     order_id = user_data.get('order_id')
 
-    if current_state == Form.familia:
-        await process_input_familia(user_input, state,order_id)
+    if current_state == Form.lens:
+        await process_handling_lens(message, user_input, state, order_id)
+
     elif current_state == Form.initsialy:
-        await process_input_initials(user_input, state, order_id)
-    else:
-        # Если мы в состоянии, не предназначенном для ввода текста (например, просто "общий выбор"),
-        # или состояние неизвестно - игнорируем сообщение.
-        logging.warning(f"Получено лишнее текстовое сообщение в состоянии {current_state}. Игнорирование.")
-        await message.answer("Пожалуйста, используйте меню для выбора действия.",
-                             reply_markup=service_level_5_keyboard(...))
+        await process_handling_initsialy(message, user_input, state, order_id)
 
+    elif current_state == Form.zvanie:
+        await process_handling_zvanie(message, user_input, state, order_id)
 
-async def process_input_familia(user_input: str, state: FSMContext, order_id: int):
-    # 1. Валидация: Проверить формат (например, должно содержать буквы и пробелы?)
-    if not user_input or len(user_input) < 2:
-        await message.answer("Пожалуйста, введите корректную фамилию.")
-        return
+    elif current_state == Form.familia:
+        await process_handling_familia(message, user_input, state, order_id)
 
-    # 2. Сохранение в FSM
-    await state.update_data(familia=user_input)
-
-    # 3. Изменение состояния и сообщение
-    new_message = f"✅ Фамилия {user_input} сохранена."
-    next_keyboard = service_level_5_1_2_keyboard(order_id=order_id)  # !!! Убедитесь, что order_id передается
-    await message.answer(new_message, reply_markup=next_keyboard)
-
-
-async def process_input_initials(user_input: str, state: FSMContext, order_id: int):
-    # ... (Аналогично обработка инициалов и переход на следующий этап)
-    pass

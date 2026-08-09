@@ -1,22 +1,27 @@
+import logging
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery
-from database import (
-    save_logs, is_admin, user_exists, add_user,
-    create_draft_order, add_order_detail,
-    get_full_order_details
-)
+from database import DatabaseManager
 from Telegram_API.keyboards.keyboards import services_keyboard, service_level_3_keyboard, service_level_2_keyboard, service_org_1_3_keyboard
 from Telegram_API.utils.common_helpers import log_selection
+
+dp_manager = DatabaseManager()
 
 router = Router()
 
 @router.message(Command("start"))
 async def start_command(message: types.Message):
     user = message.from_user
-    save_logs(user.id, message.text or "")
-    if not user_exists(user.id):
-        add_user(user_id=user.id, first_name=user.first_name, username=user.username, role="client")
+    try:
+        await dp_manager.save_logs(user.id, message.text or "")
+    except Exception as e:
+        logging.error(f"Failed to save initial log entry for user {user.id}: {e}")
+    try:
+        await dp_manager.add_user(user_id=user.id, first_name=user.first_name, username=user.username, role="client")
+    # Логирование ошибки
+    except Exception as e:
+        logging.error(f"Failed to check or add user {user.id}: {e}")
 
     # Показываем начальное меню услуг (Services -> 1)
     await message.answer(
@@ -40,16 +45,22 @@ async def menu_back(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data.startswith("service:"))
 async def services_selected(callback: CallbackQuery):
     """Обрабатывает выбор основной услуги из меню start."""
-    # ... (Остается без изменений, так как работает правильно)
     service = callback.data.split(":")[1]
+    user = callback.message.from_user
+    await dp_manager.save_logs(user.id, callback.message.text or "")
 
-    order_id = create_draft_order(
+    order_id = await dp_manager.create_draft_order(
         user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        service_type=service
+        service_type=service,
+        status="Draft",
+        from_where="START",
+        username=callback.from_user.username
     )
 
-    log_selection(order_id, category="SERVICE", key=service, label=f"Выбранная услуга {service}", value=None)
+    try:
+        await log_selection(order_id, category="SERVICE", key=service, label=f"Выбранная услуга {service}", value=None)
+    except TypeError as e:
+        logging.error(f"Failed to save logs due to Type Error in service_entry: {e}")
 
     if service == "military":
         await callback.message.edit_text(

@@ -5,8 +5,8 @@ from aiogram.types import InlineKeyboardMarkup
 from Telegram_API.handlers.complex_components import Form
 from Telegram_API.handlers.service_entry import services_keyboard
 from Telegram_API.keyboards.keyboards import (service_level_3_1_keyboard, service_level_3_2_keyboard,
-                                              service_level_4_1_keyboard, service_level_5_1_3_keyboard,
-                                              service_level_6_keyboard)
+                                              service_level_4_1_keyboard, service_level_3_2_2_keyboard,
+                                              service_level_5_1_3_keyboard, service_level_6_keyboard)
 
 async def _handle_military_route(selection_key: str, order_id: int, state: FSMContext) ->Optional[Tuple[str, Optional[InlineKeyboardMarkup], bool]] :
     """
@@ -37,15 +37,15 @@ async def _handle_military_route(selection_key: str, order_id: int, state: FSMCo
         message = f"✅ Заказ {order_id} Выбрана комплектация для 'Комендатура'. Пожалуйста, выберите техническое оснащение:"
         return message, service_level_3_1_keyboard(order_id), False
 
-    elif "kepka" in selection_key:  # Блок Петлицы
-        #Это триггер для блока 3.2 (Штанга/Петлицы)
+    elif "kepka" in selection_key:  # Блок Кепки
+        #Это триггер для блока 5.1.3 (Штанга/Петлицы)
         await state.set_state(Form.lens)
         await state.update_data(order_id=order_id)
         message = f"✅ Заказ {order_id} Выбран шеврон на полевую кепку. Пожалуйста, укажите количество:"
         return message, service_level_5_1_3_keyboard(order_id), False
 
-    elif "tehno" in selection_key:  # Блок Петлицы
-        # Это триггер для блока 3.2 (Штанга/Петлицы)
+    elif "tehno" in selection_key:  # Блок Технички
+      # Это триггер для блока 3.2 (Штанга/Петлицы)
         await state.set_state(Form.zvanie)
         await state.update_data(order_id=order_id)
         message = f"✅ Заказ {order_id} Выбраны шеврон на техничку. Пожалуйста, укажите Звание:"
@@ -54,7 +54,7 @@ async def _handle_military_route(selection_key: str, order_id: int, state: FSMCo
     elif "petlitsy" in selection_key:  # Блок Петлицы
         #Это триггер для блока 3.2 (Штанга/Петлицы)
         message = f"✅ Заказ {order_id} Выбраны Петлицы. Пожалуйста, уточните детали комплектации (Штанга/Петлицы):"
-        return message, service_level_3_2_keyboard(order_id), False
+        return message, service_level_3_2_2_keyboard(order_id), False
 
     elif "duty_services" in selection_key:
         # Дежурные службы - может сразу перекидывать на Level 6

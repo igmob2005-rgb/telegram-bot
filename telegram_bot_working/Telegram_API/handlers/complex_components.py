@@ -31,29 +31,50 @@ async def _handle_complex_component_route(selection_key: str, order_id: int, sta
         keyboard = service_level_5_keyboard(order_id)
         return message, keyboard, True
 
-    elif "fio_start" in selection_key or "set" in selection_key:  # Начало ввода ФИО (Блок 5.1)
+    elif "fio_start" in selection_key:  # Начало ввода ФИО (Блок 5.1)
         await state.set_state(Form.familia)
         await state.update_data(order_id=order_id)
-        message = f"Заказ {order_id}"
+        await state.update_data(primary_service_key='fio')
+        message = f"Заказ {order_id} \n Выберите одну из указанных опций."
         return message, service_level_5_1_keyboard(order_id), False
+
+    elif "set" in selection_key:
+        await state.set_state(Form.familia)
+        await state.update_data(order_id=order_id)
+        await state.update_data(primary_service_key='complex')
 
     elif "fio1" or "rename" in selection_key: # Начало ввода ФИО (Блок 5.1)
         await state.set_state(Form.familia)
         await state.update_data(order_id=order_id)
-        message = f"Заказ {order_id} Введите вашу фамилию"
+        await state.update_data(primary_service_key='fio')
+        message = f"Заказ {order_id}\n Введите вашу фамилию."
         return message, service_level_5_1_3_keyboard(order_id), False
 
-    elif "vsr_start" in selection_key or "vsr2" in selection_key:  # Ввод ВСР
+    elif "vsr" in selection_key:  # Ввод ВСР
         await state.set_state(Form.lens)
         await state.update_data(order_id=order_id)
-        message = f"🎉 Заказ {order_id} Количество:"
+        await state.update_data(primary_service_key='vsr')
+        message = f"🎉 Заказ {order_id}\n Введите количество:"
         # Здесь должна быть логика, которая ведет к выбору текста или файла для ВСР.
-        return message, service_level_5_1_3_keyboard(order_id), False
+        return message, None, False
 
+    elif "left_arm" in selection_key:
+        await state.set_state(Form.lens)
+        await state.update_data(order_id=order_id)
+        await state.update_data(primary_service_key='left_arm')
+        message =f"🎉 Заказ {order_id}\n Введите количество:"
+        return message, None, False
+
+    elif "right_arm" in selection_key:
+        await state.set_state(Form.lens)
+        await state.update_data(order_id=order_id)
+        await state.update_data(primary_service_key='right_arm')
+        message = f"🎉 Заказ {order_id}\n Введите количество:"
+        return message, None, False
 
     else:
         logging.warning(f"Неизвестный ключ компонента в блоке комплектации: {selection_key}")
-        return None, False
+        return None, None, False
 
 def _handle_complex_variety(selection_key: str, order_id: int) -> Optional[tuple[str, Optional[InlineKeyboardMarkup], bool]]:
     """Обрабатывает все ветвления из блока 'order:form:'."""
